@@ -1,0 +1,35 @@
+#! armcc -E
+#include "bl_link_mem_map.h"
+
+LR_IROM1 BOOTLOADER_FLASH_LOAD_ADDR BOOTLOADER_FLASH_LOAD_SIZE  {    ; load region size_region
+  UNLOAD_IROM BOOTLOADER_FLASH_LOAD_ADDR BOOTLOADER_FLASH_LOAD_SIZE  {  ; load address = execution address
+   *.o (RESET, +First)
+   .ANY (+RO)
+  }
+  
+  LOAD_IRAM_PRE1 0x00002000 0x000100  {  ; code in ram
+  *(.pre1RamCode)
+    }
+    
+  LOAD_IRAM_PRE2 0x00003000 0x000c00  {  ; code in ram
+  *(.pre2RamCode)
+    qspi_ec616s.o (+RO)
+    }
+  
+  LOAD_IRAM 0x00004000 0x003000  {  ; code in ram
+  *(.ramCode)
+  flash_ec616s.o (+RO)
+  }
+  
+  LOAD_DRAM_SHARED 0x0007000 0x006000  {  ; RW data
+  .ANY (+RW +ZI)
+  }
+
+  OVERLAY_A_RAM 0x0000d000 OVERLAY 0x033000  {
+   *(HEAP)
+  }
+
+  LOAD_DRAM_FOTA 0x000d000 OVERLAY EMPTY 0x033000  {  ; RW data
+  }
+}
+

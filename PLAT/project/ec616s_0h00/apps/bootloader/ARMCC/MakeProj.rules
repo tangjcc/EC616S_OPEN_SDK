@@ -1,0 +1,37 @@
+ifeq ($(CONFIG_PROJ_APP_SECURITY_BOOT), y)
+CONFIG_PROJ_BL_SECURITY_BOOT = y
+endif
+
+ifeq ($(CONFIG_PROJ_BL_SECURITY_BOOT), y)
+
+.PHONY: build
+BUILDDIR ?= $(TOP)/PLAT/out/$(TARGET)/$(PROJECT)
+EC_SECURE_TOOL := $(TOP)/PLAT/tools/ECSecTools/ECSecTools.exe
+EC_SECURE_TOOL_CFG ?= $(TOP)/PLAT/tools/ECSecTools/config_secure.ini
+
+BIN_HEAD_NAME := $(BINNAME)_head
+
+POST_SIGN_HEAD_FILE := $(BUILDDIR)/$(BIN_HEAD_NAME).bin
+
+$(POST_SIGN_HEAD_FILE):$(BUILDDIR)/$(BINNAME).axf
+	$(EC_SECURE_TOOL) --cfgfile $(EC_SECURE_TOOL_CFG) genimghd bootloader
+	
+build:$(POST_SIGN_HEAD_FILE)
+	
+endif        
+
+ifeq ($(CONFIG_PROJ_APP_SECURITY_BOOT), y)
+
+SYSTEM_VERIFY_KEY_FILE_SRC := $(BUILDDIR)/PLAT/project/$(TARGET)/apps/$(PROJECT)/VerifyKeyFile.c
+SYSTEM_VERIFY_KEY_FILE_DIR := $(dir $(SYSTEM_VERIFY_KEY_FILE_SRC))
+
+$(SYSTEM_VERIFY_KEY_FILE_SRC): 
+	mkdir -p $(SYSTEM_VERIFY_KEY_FILE_DIR)
+	$(EC_SECURE_TOOL) --cfgfile $(EC_SECURE_TOOL_CFG) genkeycsrc --output $@
+
+SYSTEM_VERIFY_KEY_FILE_OBJ := $(SYSTEM_VERIFY_KEY_FILE_SRC:.c=.o)
+
+
+endif
+
+

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<efusetop version="1.0">
+  <efuse-config>
+    <hw-platbits>
+    	<jtag_disable>0</jtag_disable>
+			<security_booten>1</security_booten>    	
+			<uartdbg_disable>0</uartdbg_disable>
+			<download_disable>0</download_disable>
+			<rom_resetflash>0</rom_resetflash>	
+			<rsv0>0</rsv0>    	
+			<rsv1>0</rsv1>    
+			<rsv2>0</rsv2>    				
+    </hw-platbits>
+		<sw-ecdsa>67447A2E1E206F2BD6275C41668DAA403B3E524B3E344DCE918C5B0286AA7C1B1295E758B2486125F6684D1AA5B5F20102FC8681D3553302AAE900860AD33A67</sw-ecdsa>  
+  </efuse-config>
+  <efuse-burnlist>
+		<burn-platbits>1</burn-platbits>
+		<burn-swecdsa>1</burn-swecdsa>
+  </efuse-burnlist>
+</efusetop>
+    

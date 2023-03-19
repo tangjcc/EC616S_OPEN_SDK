@@ -1,0 +1,30 @@
+#! armcc -E
+#include "mem_map.h"
+
+LR_IROM1 APP_FLASH_LOAD_ADDR APP_FLASH_LOAD_SIZE  {    ; load region size_region
+  UNLOAD_IROM APP_FLASH_LOAD_ADDR APP_FLASH_LOAD_SIZE  {  ; load address = execution address
+   *.o (RESET, +First)
+   .ANY (+RO)
+  }
+  UNLOAD_NOCACHE +0 ALIGN 128{
+  cache*.o (+RO)
+  }
+  LOAD_IRAM1 0x00004000  {  ; code in ram
+  *(.ramCode)
+  flash_ec616s.o (+RO)
+  qspi_ec616s.o (+RO)  
+  }
+
+  ScatterAssert(ImageLimit(LOAD_IRAM1) < 0x0000C000)
+
+  LOAD_DRAM_SHARED 0x0000C000 0x030000  {  ; RW data
+  .ANY (+RW +ZI)
+  }
+  
+  ScatterAssert(ImageLimit(LOAD_DRAM_SHARED) < HEAP_MEM_MAX_START_ADDR)
+  
+  
+  LOAD_DRAM_BSP 0x041000 {  
+  }
+
+}

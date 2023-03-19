@@ -1,0 +1,9 @@
+Program Name£ºECSecTools
+Version£ºECSecTools v1.07
+V1.07
+20200730
+1.Update some function.
+
+V1.06
+20200306
+1. Fix genkey cmd err

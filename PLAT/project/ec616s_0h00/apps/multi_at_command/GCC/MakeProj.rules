@@ -1,0 +1,27 @@
+
+ifeq ($(CONFIG_PROJ_APP_SECURITY_BOOT), y)
+BUILDDIR ?= $(TOP)/PLAT/out/$(TARGET)/$(PROJECT)
+
+EC_SECURE_TOOL := $(TOP)/PLAT/tools/FlashRun/FlashRun.exe
+EC_SECURE_TOOL_CFG ?= $(TOP)/PLAT/tools/FlashRun/config_secure.ini
+
+BIN_HEAD_NAME := $(BINNAME)_head
+
+#$(BUILDDIR)/$(BIN_HEAD_NAME).bin: $(BUILDDIR)/$(BINNAME).bin
+#	$(EC_SECURE_TOOL) genimghd bootloader
+
+#.PHONY: POST_SIGN_STEP
+.PHONY: build
+
+POST_SIGN_HEAD_FILE := $(BUILDDIR)/$(BIN_HEAD_NAME).bin
+
+$(POST_SIGN_HEAD_FILE):$(BUILDDIR)/$(BINNAME).elf
+	$(EC_SECURE_TOOL) --cfgfile $(EC_SECURE_TOOL_CFG) genimghd system
+	
+build:$(POST_SIGN_HEAD_FILE)
+	
+
+endif        
+
+
+

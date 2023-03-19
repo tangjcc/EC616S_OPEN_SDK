@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="efusetop">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="efuse-config"/>
+        <xs:element ref="efuse-burnlist"/>        
+      </xs:sequence>
+      <xs:attribute name="version" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="efuse-config">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ctrl-flags" minOccurs="0" />
+        <xs:element ref="ctrl-disable" minOccurs="0" />
+        <xs:element ref="hw-trim" minOccurs="0" />
+        <xs:element ref="hw-dcxo" minOccurs="0" />
+        <xs:element ref="hw-platbits" minOccurs="0"/>
+        <xs:element ref="hw-platspare" minOccurs="0" />
+        <xs:element ref="sw-appspare" minOccurs="0" />
+        <xs:element ref="sw-ecdsa" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="efuse-burnlist">
+    <xs:complexType>
+      <xs:sequence>
+				<xs:element name="burn-ctrlflags" type="bit_type" minOccurs="0" />
+				<xs:element name="burn-ctrldis" type="bit_type" minOccurs="0" />
+				<xs:element name="burn-hwtrim" type="bit_type" minOccurs="0" />		
+				<xs:element name="burn-hwdcxo" type="bit_type" minOccurs="0" />				
+				<xs:element name="burn-platbits" type="bit_type" minOccurs="0"/>
+				<xs:element name="burn-platspare" type="bit_type" minOccurs="0" />	
+				<xs:element name="burn-hwaes" type="bit_type" minOccurs="0" />				
+				<xs:element name="burn-swappspare" type="bit_type" minOccurs="0" />
+				<xs:element name="burn-swecdsa" type="bit_type" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  
+	<xs:element name="ctrl-flags">  
+		<xs:complexType>
+      <xs:sequence>
+				<xs:element name="ctrlflag-test" type="bit_type"/>
+				<xs:element name="ctrlflag-trim" type="bit_type"/>
+				<xs:element name="ctrlflag-dcxo" type="bit_type"/>		
+				<xs:element name="ctrlflag-plat" type="bit_type"/>		
+				<xs:element name="ctrlflag-aes" type="bit_type"/>		
+				<xs:element name="ctrlflag-app" type="bit_type"/>		
+				<xs:element name="ctrlflag-rsv0" type="bit_type"/>		
+				<xs:element name="ctrlflag-rsv1" type="bit_type"/>		
+      </xs:sequence>      		
+		</xs:complexType>				
+  </xs:element>		  
+  
+  <xs:element name="ctrl-disable">  
+		<xs:complexType>
+      <xs:sequence>
+				<xs:element name="burn-dis-all" type="bit_type"/>
+				<xs:element name="burn-dis-trim" type="bit_type"/>
+				<xs:element name="burn-dis-dcxo" type="bit_type"/>		
+				<xs:element name="burn-dis-plat" type="bit_type"/>		
+				<xs:element name="burn-dis-aes" type="bit_type"/>		
+				<xs:element name="burn-dis-app" type="bit_type"/>		
+				<xs:element name="burn-dis-rsv0" type="bit_type"/>		
+				<xs:element name="burn-dis-rsv1" type="bit_type"/>		
+      </xs:sequence>      		
+		</xs:complexType>				
+  </xs:element>		
+  
+  <xs:element name="hw-trim">  
+		<xs:complexType>
+      <xs:sequence>
+        <xs:element ref="trim_ldo_io33" minOccurs="0"/>
+        <xs:element ref="trim_dcdc_lv15" minOccurs="0"/>
+        <xs:element ref="trim_ldo_dig11" minOccurs="0"/>
+        <xs:element ref="trim_dcdc_hv20" minOccurs="0"/>
+        <xs:element ref="trim_ldo_flash" minOccurs="0"/>
+        <xs:element ref="trim_ldo_tcxo" minOccurs="0"/>
+        <xs:element ref="trim_ldo_rf18" minOccurs="0"/>   
+        <xs:element ref="trim_aptadc_scale" minOccurs="0"/>        
+				<xs:element ref="trim_dcdc_pa" minOccurs="0"/>           
+				<xs:element ref="trim_ldo_fem" minOccurs="0"/>           				
+				<xs:element ref="trim_rf_bg" minOccurs="0"/> 
+				<xs:element ref="trim_auxadc_dcofst" minOccurs="0"/> 				
+				<xs:element ref="trim_auxadc_ratio" minOccurs="0"/> 
+				<xs:element ref="trim_tsensor" minOccurs="0"/> 				
+				<xs:element ref="trim_ldo_sim" minOccurs="0"/>
+      </xs:sequence>      		
+		</xs:complexType>				
+  </xs:element>		  
+  
+	<xs:element name="hw-dcxo">  
+		<xs:complexType>
+      <xs:sequence>
+        <xs:element ref="trim_dcxo"/>
+      </xs:sequence>      		
+		</xs:complexType>				
+  </xs:element>		    
+  
+ 
+  <xs:element name="hw-platbits">  
+		<xs:complexType>
+      <xs:sequence>
+				<xs:element name="jtag_disable" type="bit_type"/>
+	      <xs:element name="security_booten" type="bit_type"/>
+	      <xs:element name="uartdbg_disable" type="bit_type"/>
+	      <xs:element name="download_disable" type="bit_type"/>
+	      <xs:element name="rom_resetflash" type="bit_type"/>
+	      <xs:element name="rsv0" type="bit_type"/>
+	      <xs:element name="rsv1" type="bit_type"/>      
+	      <xs:element name="rsv2" type="bit_type"/>  
+      </xs:sequence>      		
+		</xs:complexType>					
+  </xs:element>		   
+ 
+  <xs:element name="hw-platspare">  
+		<xs:simpleType>
+   			<xs:restriction base="xs:token">
+            <xs:pattern value="([0-9]|[a-f]|[A-F]){10}"/>
+        </xs:restriction>	        
+		</xs:simpleType>					
+  </xs:element>		  
+  
+	<xs:element name="sw-appspare">  
+		<xs:simpleType>
+   			<xs:restriction base="xs:token">
+            <xs:pattern value="([0-9]|[a-f]|[A-F]){32}"/>
+        </xs:restriction>	        
+		</xs:simpleType>					
+  </xs:element>		    
+  
+	<!--ecdsa pubkey 64 bytes-->
+	<xs:element name="sw-ecdsa">  
+		<xs:simpleType>
+   			<xs:restriction base="xs:token">
+            <xs:pattern value="([0-9]|[a-f]|[A-F]){128}"/>
+        </xs:restriction>	        
+		</xs:simpleType>					
+  </xs:element>		  
+ 	
+	<xs:element name="trim_ldo_io33">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0-1]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>
+
+  <xs:element name="trim_dcdc_lv15">
+    <xs:simpleType>
+      <xs:restriction base="xs:token">
+        <xs:pattern value="([0-1]){6}[0]{2}"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:element>
+
+  <xs:element name="trim_ldo_dig11">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>					
+	
+	<xs:element name="trim_dcdc_hv20">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+  
+	<xs:element name="trim_ldo_flash">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+  
+	<xs:element name="trim_ldo_tcxo">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+
+	<xs:element name="trim_ldo_rf18">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+
+	<xs:element name="trim_aptadc_scale">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){7}[0]{1}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+
+	<xs:element name="trim_dcdc_pa">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+
+	<xs:element name="trim_ldo_fem">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			 
+
+	<xs:element name="trim_rf_bg">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){4}[0]{4}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			 
+
+	<xs:element name="trim_auxadc_dcofst">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){8}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			
+  
+	<xs:element name="trim_auxadc_ratio">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){8}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			 
+    
+	<xs:element name="trim_tsensor">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){8}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			     
+  
+	<xs:element name="trim_ldo_sim">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>			       
+	
+	<xs:element name="trim_dcxo">
+		<xs:simpleType>
+			<xs:restriction base="xs:token">
+				<xs:pattern value="([0-1]){6}[0]{2}"/>
+			</xs:restriction>	        
+		</xs:simpleType>	
+  </xs:element>		
+	
+	<xs:element name="jtag_disable" type="bit_type"/>
+	<xs:element name="security_booten" type="bit_type"/>
+	<xs:element name="uartdbg_disable" type="bit_type"/>
+	<xs:element name="download_disable" type="bit_type"/>
+	<xs:element name="rom_resetflash" type="bit_type"/>
+	<xs:element name="rsv0" type="bit_type"/>
+	<xs:element name="rsv1" type="bit_type"/>
+	<xs:element name="rsv2" type="bit_type"/>
+   
+	<xs:element name="burn-dis-all" type="bit_type"/>
+	<xs:element name="burn-dis-trim" type="bit_type"/>
+	<xs:element name="burn-dis-dcxo" type="bit_type"/>		
+	<xs:element name="burn-dis-plat" type="bit_type"/>		
+	<xs:element name="burn-dis-aes" type="bit_type"/>		
+	<xs:element name="burn-dis-app" type="bit_type"/>		
+	<xs:element name="burn-dis-rsv0" type="bit_type"/>		
+	<xs:element name="burn-dis-rsv1" type="bit_type"/>		
+	
+  <!--type definitions-->
+  <xs:simpleType name="hex_short">
+    <xs:restriction base="xs:token">
+      <xs:pattern value="([0-9]|[a-f]|[A-F]){4}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="hex_string">
+    <xs:restriction base="xs:token">
+      <xs:pattern value="([0-9]|[a-f]|[A-F])*"/>
+    </xs:restriction>
+  </xs:simpleType>
+  
+  <xs:simpleType name="bit_type">
+    <xs:restriction base="xs:integer">
+			<xs:minInclusive value="0" fixed="true"/>
+			<xs:maxInclusive value="1" fixed="true"/>    
+		</xs:restriction>
+  </xs:simpleType>
+  <!--efuse schema end-->
+
+</xs:schema>
