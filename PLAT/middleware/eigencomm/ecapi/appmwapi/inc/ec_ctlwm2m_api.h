@@ -51,6 +51,7 @@ uint16_t ctiot_funcv1_cmdrsp(ctiot_funcv1_context_t* pTContext,uint16_t msgId,ch
 uint16_t ctiot_funcv1_notify(ctiot_funcv1_context_t* pTContext,char* token,char* uriStr,uint8_t dataFormat,char* dataS,uint8_t sendMode);
 uint16_t ctiot_funcv1_get_status(ctiot_funcv1_context_t* pTContext,uint8_t queryType,uint16_t msgId);
 uint16_t ctiot_funcv1_send(ctiot_funcv1_context_t* pTContext,char* data,ctiot_funcv1_send_mode_e sendMode, ctiot_callback_notify notifyCallback, UINT8 seqNum);
+uint16_t ctiot_funcv1_str_to_hex(uint8_t *str, uint32_t strLen, uint8_t *outStr, uint32_t *outLen);
 void ctiot_funcv1_clean_params(void);
 void ctiot_funcv1_clean_context(void);
 uint16_t ctiot_funcv1_set_psk(ctiot_funcv1_context_t* pContext,uint8_t securityMode,uint8_t* pskId,uint8_t* psk);

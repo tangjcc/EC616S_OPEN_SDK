@@ -3016,6 +3016,35 @@ exit:
 }
 
 
+
+uint16_t ctiot_funcv1_str_to_hex(uint8_t *str, uint32_t strLen, uint8_t *outStr, uint32_t *outLen)
+{
+    char i = 0 ;
+    unsigned char ch1 = 0, ch2 = 0;
+    if(strLen * 2 > *outLen)
+    {
+        return -1;
+    }
+    
+    for(i = 0; i < strLen; i++)
+    {
+        ch1 = (str[i] & 0xf0) >> 4;
+        ch2 = (str[i] & 0x0f);
+
+        ch1 += ((ch1 > 9) ? 0x57 : 0x30);
+        ch2 += ((ch2 > 9) ? 0x57 : 0x30);
+
+        outStr[2*i + 0] = ch1;
+        outStr[2*i + 1] = ch2;
+    }
+
+    outStr[strLen * 2 ] = 0;
+    *outLen = strLen * 2;
+    return 0;
+} 
+
+
+
 uint16_t ctiot_funcv1_cmdrsp(ctiot_funcv1_context_t* pTContext,uint16_t msgId,char* token,uint16_t responseCode,char* uriStr,uint8_t observe,uint8_t dataFormat,char* dataS)
 {
 
