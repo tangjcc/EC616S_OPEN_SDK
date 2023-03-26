@@ -19,6 +19,9 @@
 #define RTE_UART1_TX_IO_MODE    POLLING_MODE
 #define RTE_UART1_RX_IO_MODE    DMA_MODE
 
+#define RTE_UART2_TX_IO_MODE    POLLING_MODE
+#define RTE_UART2_RX_IO_MODE    POLLING_MODE//IRQ_MODE
+
 #define RTE_SPI0_IO_MODE          POLLING_MODE
 
 #define RTE_SPI1_IO_MODE          POLLING_MODE
@@ -117,10 +120,10 @@
 #define RTE_UART1_CTS_BIT               22
 #define RTE_UART1_CTS_FUNC              PAD_MuxAlt1
 
-#define RTE_UART1_RX_BIT                25
+#define RTE_UART1_RX_BIT                23
 #define RTE_UART1_RX_FUNC               PAD_MuxAlt1
 
-#define RTE_UART1_TX_BIT                26
+#define RTE_UART1_TX_BIT                24
 #define RTE_UART1_TX_FUNC               PAD_MuxAlt1
 
 // DMA
@@ -133,16 +136,16 @@
 
 // UART2 (Universal asynchronous receiver transmitter) [Driver_USART2]
 // Configuration settings for Driver_USART2 in component ::Drivers:USART
-#define RTE_UART2                       0
+#define RTE_UART2                       1
 #define RTE_UART2_CTS_PIN_EN            0
 #define RTE_UART2_RTS_PIN_EN            0
 
 // { PAD_PIN15},  // 0 : gpio4 / 3 : UART2 RXD
 // { PAD_PIN16},  // 0 : gpio5 / 3 : UART2 TXD
-#define RTE_UART2_RX_BIT                15
+#define RTE_UART2_RX_BIT                9
 #define RTE_UART2_RX_FUNC               PAD_MuxAlt3
 
-#define RTE_UART2_TX_BIT                16
+#define RTE_UART2_TX_BIT                10
 #define RTE_UART2_TX_FUNC               PAD_MuxAlt3
 
 

@@ -38,6 +38,7 @@ typedef enum
     APP_OC_CONTEXT_RECOVER,
     APP_WAIT_APP_ACT,
     APP_CT_OBSV_RESP,
+    APP_CT_REQUEST_RECV,
     APP_IDLE_STATE
 } appStateMachine_t;
 
@@ -52,7 +53,8 @@ typedef enum
     APP_OC_OBSV_FAILED,
     APP_PARAM_ERROR,
     APP_INTER_ERROR,
-    APP_OC_REG_FAILED
+    APP_OC_REG_FAILED,
+    APP_GPS_RECEIVED
 } appRunningState_t;
 
 typedef enum
