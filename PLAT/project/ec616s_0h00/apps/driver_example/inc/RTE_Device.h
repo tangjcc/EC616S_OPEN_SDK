@@ -114,10 +114,10 @@
 #define RTE_UART1_CTS_BIT               22
 #define RTE_UART1_CTS_FUNC              PAD_MuxAlt1
 
-#define RTE_UART1_RX_BIT                25
+#define RTE_UART1_RX_BIT                23
 #define RTE_UART1_RX_FUNC               PAD_MuxAlt1
 
-#define RTE_UART1_TX_BIT                26
+#define RTE_UART1_TX_BIT                24
 #define RTE_UART1_TX_FUNC               PAD_MuxAlt1
 
 // DMA

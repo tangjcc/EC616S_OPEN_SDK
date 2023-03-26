@@ -19,7 +19,7 @@ void main_entry(void)
     BSP_CommonInit();
 
     //printf IO retarget for debug purpose
-    if(exampleId != USART_EX)
+    //if(exampleId != USART_EX)
     {
         BSP_CustomInit();
     }

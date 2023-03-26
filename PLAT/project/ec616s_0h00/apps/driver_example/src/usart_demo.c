@@ -8,7 +8,7 @@
  */
 
 /** \brief usart receive buffer length in unit of byte */
-#define RECV_BUFFER_LEN     (16)
+#define RECV_BUFFER_LEN     (128)
 
 //#if(RTE_UART0)
 
@@ -114,6 +114,7 @@ void USART_ExampleEntry_org(void)
 
 void USART_ExampleEntry(void)
 {
+	printf("USART_ExampleEntry\r\n");
     /*Initialize the USART driver */
     USARTdrv->Initialize(USART_callback);
 
@@ -125,7 +126,7 @@ void USART_ExampleEntry(void)
                       ARM_USART_DATA_BITS_8 |
                       ARM_USART_PARITY_NONE |
                       ARM_USART_STOP_BITS_1 |
-                      ARM_USART_FLOW_CONTROL_NONE, 115200);
+                      ARM_USART_FLOW_CONTROL_NONE, 9600); /*GPS 9600; OLD:115200*/
 
     uint8_t* greetStr = "UART Echo Demo\n";
 
@@ -133,7 +134,7 @@ void USART_ExampleEntry(void)
 
     while (1)
     {
-
+		printf("Waiting...\r\n");
         // In polling mode, receive api will block until required recv len is reached.
         // In interrupt or dma mode, receive api returns immdiately after transation starts.  
 
@@ -143,6 +144,10 @@ void USART_ExampleEntry(void)
 #elif (RTE_UART_RX_IO_MODE == IRQ_MODE) || (RTE_UART_RX_IO_MODE == DMA_MODE)
 
         USARTdrv->Receive(recBuffer, RECV_BUFFER_LEN);
+		char ss[128] = {0};
+		strcpy(ss, recBuffer);
+		printf(">>%s\r\n", ss);
+		printf("[0x%02x0x%02x0x%02x0x%02x]\r\n", recBuffer[0], recBuffer[1], recBuffer[2], recBuffer[3]);
 
         while((isRecvTimeout == false) && (isRecvComplete == false));
 
@@ -156,6 +161,7 @@ void USART_ExampleEntry(void)
             isRecvComplete = false;
             USARTdrv->Send(recBuffer, RECV_BUFFER_LEN);
         }
+		//memset(recBuffer, 0, sizeof(recBuffer));
 #else
 #error "UART RX IO MODE IS NOT SUPPORTED IN THIS EXAMPLE"
 #endif
