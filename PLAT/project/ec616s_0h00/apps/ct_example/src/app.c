@@ -43,6 +43,10 @@ static void appTask(void *arg)
     CT_STATUS_Q_MSG ctMsg;
     int msg_type = 0xff;
     APP_CMD_Q_MSG cmdMsg;
+	uint8_t  ddatabuf[24]={0};
+	unsigned int lllen=24;
+	uint8_t  sendbuf[40]={0};
+	
     memset(&cmdMsg, 0, sizeof(cmdMsg));
     while(1)
     {
@@ -56,7 +60,24 @@ static void appTask(void *arg)
                  ECOMM_TRACE(UNILOG_PLA_APP, appTask_1, P_INFO, 0, "can send packet");
                  //SENDMODE_CON_REL is necessay for low power consumption, seqNumb can be ignore
                  //SENDMODE_CON is mandatory if DL data immediately after UL data
-                 ctiot_funcv1_send(NULL, "0356323334", SENDMODE_CON, NULL, seqNumb);
+                 //ctiot_funcv1_send(NULL, "0356323334", SENDMODE_CON, NULL, seqNumb);
+				 //printf("send begin\n");
+				 if(ctiot_funcv1_str_to_hex("hello world",11,ddatabuf,&lllen)==0)
+				 {
+				 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_100, P_INFO, 3, "020009%04x;ddatabuf:[%x%x]",lllen,ddatabuf[0], ddatabuf[1]);
+					//printf("ddatabuf:%s\n",ddatabuf);
+				 }
+				 else
+				 {
+				 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_99, P_INFO, 1, "fail -1");
+					//printf("fail -1\n");
+				 }
+				 ECOMM_STRING(UNILOG_PLA_APP, appTask_101, P_INFO, "ddatabuf:%s", (uint8_t *)ddatabuf);
+				 sprintf(sendbuf, "020009%04X", 11);
+				 strcat(sendbuf, ddatabuf);
+				 ECOMM_STRING(UNILOG_PLA_APP, appTask_102, P_INFO, "sendbuf:%s", (uint8_t *)sendbuf); //"020009000B68656c6c6f20776f726c64"
+				 ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, seqNumb);
+				 
                  break;
             case APP_SEND_PACKET_DONE://recive send packet's ACK
                  ECOMM_TRACE(UNILOG_PLA_APP, appTask_2, P_INFO, 0, "packet arrived, enable sleep");

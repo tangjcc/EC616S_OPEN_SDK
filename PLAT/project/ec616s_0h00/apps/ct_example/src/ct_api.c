@@ -180,6 +180,80 @@ static INT32 ocPSUrcCallback(urcID_t eventID, void *param, UINT32 paramLen)
     return 0;
 }
 
+extern uint8_t* prv_at_decode(char* data,int datalen);
+
+static void RecvProcessing(UINT8 *atbuff, INT32 arg_len)
+{
+	UINT32 msgHeadLen = 1 + 2 * 3;
+	UINT32 headLen = strlen("+CTM2MRECV: ");
+	ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_0, P_INFO, "atbuff:%s", (uint8_t *)atbuff);
+	if (arg_len < headLen + msgHeadLen * 2) {
+		ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_0_1, P_INFO, 0, "error Len: arg_len:%d; except:%d", arg_len, headLen + msgHeadLen * 2);
+		return;
+	}
+	uint8_t * buff = prv_at_decode(atbuff + headLen, arg_len - headLen);
+	UINT32 i = 0;
+	UINT8 cmdType = buff[i];
+	i++;
+	UINT16 srvId = buff[i] << 8 | buff[i+1];
+	i += 2;
+	UINT16 taskId = buff[i] << 8 | buff[i+1];
+	i += 2;
+	UINT16 dataLen = buff[i] << 8 | buff[i+1];
+	i += 2;
+	//UINT8 *data = &buff[i];
+	uint8_t  sendbuf[60]={0};
+	/* times buff */
+	UINT8 respType = 0x86;
+	UINT16 respSrvId = 9003;
+	UINT16 timesLen = 12;
+	uint8_t times[32]={0};
+	UINT32 lllen = (timesLen + 1) * 2;
+
+	char rawDate[20] = {0};
+	int rawDateLen = 0;
+	GpsGetDateTimeString(rawDate, 20, &rawDateLen);
+	if (rawDateLen > 0) {
+		ctiot_funcv1_str_to_hex(rawDate,12,times,&lllen);
+	} else {
+		ctiot_funcv1_str_to_hex("202205121810",12,times,&lllen);
+	}
+
+	/* location buff */
+	UINT16 locRespSrvId = 9005;
+	UINT16 locLen = 20;
+	uint8_t locs[40]={0};
+	UINT32 locllen = (locLen + 1) * 2;
+
+	char rawLoc[24] = 0;
+	int rawLocLen = 0;
+	GpsGetLocationString(rawLoc, 24, &rawLocLen);
+	if (rawLocLen > 0) {
+		ctiot_funcv1_str_to_hex(rawLoc,20,locs,&locllen);
+	} else {
+		ctiot_funcv1_str_to_hex("E180.22.33N044.55.11", 20 ,locs,&locllen);
+	}
+
+	
+	ct_lwm2m_free(buff);
+
+	ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_1, P_INFO, 4, "cmdType:%d; srvId:%x; taskId:%d; dataLen:%d", cmdType, srvId, taskId, dataLen);
+	switch (cmdType) {
+		case 6:
+			if (srvId == 8003) { // get_devtime
+				sprintf(sendbuf, "%02x%04x%04x%04x%s", respType, respSrvId, taskId, timesLen, times);
+				ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_2, P_INFO, "resp:%s", (uint8_t *)sendbuf);
+				ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, 0);
+			} else if (srvId == 8005) { // get_dev_location
+				sprintf(sendbuf, "%02x%04x%04x%04x%s", respType, locRespSrvId, taskId, locLen, locs);
+				ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_3, P_INFO, "resp:%s", (uint8_t *)sendbuf);
+				ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, 0);
+			}
+		break;
+	}
+	return;
+}
+
 /*WARNING NO TIME-CONSUMING OPERATIONS CAN BE USED IN THIS FUNCTION!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 static void ctEventHandler(module_type_t type, INT32 code, const void* arg, INT32 arg_len)
 {
@@ -296,7 +370,8 @@ static void ctEventHandler(module_type_t type, INT32 code, const void* arg, INT3
                 memset(recvBuff, 0, sizeof(recvBuff));
                 memcpy(recvBuff, (CHAR*)arg, ((arg_len > 256)?256:arg_len));
                 ECOMM_STRING(UNILOG_PLA_APP, ctEventHandler_9, P_INFO, "%s", recvBuff);
-                stateMachine = APP_IDLE_STATE;
+				//printf("recvBuff:%s\n",recvBuff);
+                stateMachine = APP_CT_REQUEST_RECV;//APP_IDLE_STATE;
                 //ctiot_funcv1_sleep_vote(SYSTEM_STATUS_FREE);
             }
             break;
@@ -627,6 +702,13 @@ static void ctConnectTask(void *arg)
                }
                break;
            }
+		   case APP_CT_REQUEST_RECV:
+		   {
+		   	   RecvProcessing(recvBuff, strlen(recvBuff));
+			   memset(recvBuff, 0, sizeof(recvBuff));
+			   stateMachine = APP_IDLE_STATE;
+		   	   break;
+		   }
            case  APP_SENDING_PACKET_STATE://send the data waiting ack
            case  APP_WAITING_ONLINE_STATE://waiting nb-iot client online
            default:
