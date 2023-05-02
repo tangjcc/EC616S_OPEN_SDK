@@ -21,14 +21,14 @@ typedef struct {
 	unsigned int weidu;
 	unsigned int weiduMin;
 	unsigned int weiduSec;
-	unsigned int altitude;
+	double altitude;
 	unsigned int satNum;
 }GPS_Location;
 
 #define GPGGA_STR "GPGGA"
 #define GPRMC_STR "GPRMC"
 
-#define GPS_DATA_HEAD_LEN 5
+#define GPS_DATA_HEAD_LEN 6
 
 unsigned char GPS_IS_GPGGA_DATA(unsigned char *rawData);
 unsigned char GPS_IS_GPRMC_DATA(unsigned char *rawData);

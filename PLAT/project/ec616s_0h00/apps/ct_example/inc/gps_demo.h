@@ -16,5 +16,7 @@ void gpsApiInit(void);
  
 void GpsDataRecvProcessing(uint8_t *rawData, uint32_t rawDataLen);
 void GpsGetData(GPS_Date **date, GPS_Location **loc);
+void GpsGetDateTimeString(char *out, int maxLen, int *actLen);
+void GpsGetLocationString(char *out, int maxLen, int *actLen);
 
 

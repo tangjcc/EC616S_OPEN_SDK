@@ -203,9 +203,9 @@ void GpsDataProcEntry(void *arg)
 
 // app task static stack and control block
 #ifdef WITH_DTLS
-    #define GPS_TASK_STACK_SIZE    (4096)
+    #define GPS_TASK_STACK_SIZE    (512)
 #else
-    #define GPS_TASK_STACK_SIZE    (2048)
+    #define GPS_TASK_STACK_SIZE    (1024)
 #endif
 
 static StaticTask_t             gpsDataProcTask;
@@ -243,13 +243,16 @@ void gpsApiInit(void)
     task_attr.name = "usart_task";
     task_attr.stack_mem = usartTaskStack;
     task_attr.stack_size = GPS_TASK_STACK_SIZE;
-    task_attr.priority = osPriorityNormal;
+    task_attr.priority = osPriorityBelowNormal7;
     task_attr.cb_mem = &usartTask;//task control block
     task_attr.cb_size = sizeof(StaticTask_t);//size of task control block
 
     osThreadNew(USART_ExampleEntry, NULL, &task_attr);  //创建连接平台线程
 	gpsDataProcInit();
 }
+
+extern unsigned char Flag_Calc_GPGGA_OK;
+extern unsigned char Flag_Calc_GPRMC_OK;
 
 GPS_Date g_GPS_Date = {0};
 GPS_Location g_GPS_Location = {0};
@@ -281,6 +284,9 @@ void GpsGetDateTimeString(char *out, int maxLen, int *actLen)
 	if (out == NULL || maxLen < 14) {
 		return;
 	}
+	if (Flag_Calc_GPGGA_OK == 0 && Flag_Calc_GPRMC_OK == 0) {
+		return;
+	}
 	GPS_Date *date = &g_GPS_Date;
 	sprintf(out, "%04d%02d%02d%02d%02d%02d\r\n", 
 		date->Year, date->Month, date->Day, date->Hour, date->Min, date->Sec);
@@ -290,6 +296,9 @@ void GpsGetDateTimeString(char *out, int maxLen, int *actLen)
 void GpsGetLocationString(char *out, int maxLen, int *actLen)
 {
 	if (out == NULL || maxLen < 20) {
+		return;
+	}
+	if (Flag_Calc_GPGGA_OK == 0) {
 		return;
 	}
 	GPS_Location *loc = &g_GPS_Location;
