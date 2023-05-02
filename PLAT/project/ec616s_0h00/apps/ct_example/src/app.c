@@ -30,13 +30,16 @@
 #define INIT_TASK_STACK_SIZE    (1024)
 static StaticTask_t             initTask;
 static UINT8                    appTaskStack[INIT_TASK_STACK_SIZE];
-UINT32 sendDataItv = 1200;
+UINT32 sendDataItv = 600;
 UINT8 seqNumb = 0;
 UINT8 retrySend = 0;
 
 QueueHandle_t app_cmd_msg_handle = NULL;
 
 extern QueueHandle_t ct_state_msg_handle;
+
+extern void CtIotReportDevTimes(void);
+extern void CtIotReportDevLocation(void);
 
 static void appTask(void *arg)
 {
@@ -77,6 +80,10 @@ static void appTask(void *arg)
 				 strcat(sendbuf, ddatabuf);
 				 ECOMM_STRING(UNILOG_PLA_APP, appTask_102, P_INFO, "sendbuf:%s", (uint8_t *)sendbuf); //"020009000B68656c6c6f20776f726c64"
 				 ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, seqNumb);
+
+				 CtIotReportDevTimes();
+				 CtIotReportDevLocation();
+				 //CtIotReportDevInfos();
 				 
                  break;
             case APP_SEND_PACKET_DONE://recive send packet's ACK
@@ -123,10 +130,6 @@ static void appTask(void *arg)
             case APP_INTER_ERROR:   //code error 
                  ECOMM_TRACE(UNILOG_PLA_APP, appTask_9, P_ERROR, 0, "oc parameter error or internal error check the code");
                  ctiot_funcv1_enable_sleepmode();
-                 break;
-			case APP_GPS_RECEIVED:   //GPS
-                 //ECOMM_TRACE(UNILOG_PLA_APP, appTask_10, P_ERROR, 0, "APP_GPS_RECEIVED");
-                 printf("APP_GPS_RECEIVED\r\n");
                  break;
         }
     }

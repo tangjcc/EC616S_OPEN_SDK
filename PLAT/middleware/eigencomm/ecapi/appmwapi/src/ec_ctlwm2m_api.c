@@ -3017,7 +3017,7 @@ exit:
 
 
 
-uint16_t ctiot_funcv1_str_to_hex(uint8_t *str, uint32_t strLen, uint8_t *outStr, uint32_t *outLen)
+uint16_t ctiot_funcv1_str_to_hex(const char *str, uint32_t strLen, char *outStr, uint32_t *outLen)
 {
     char i = 0 ;
     unsigned char ch1 = 0, ch2 = 0;

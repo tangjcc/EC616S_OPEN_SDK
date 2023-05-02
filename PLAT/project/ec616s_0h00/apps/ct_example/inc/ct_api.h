@@ -79,6 +79,43 @@ typedef enum
     SYS_NOT_SLEEP
 } sleepState_t;
 
+typedef enum
+{
+    CTWING_CMD_TYPE_RPT = 0x02,
+    CTWING_CMD_TYPE_REQ = 0x06,
+    CTWING_CMD_TYPE_RESP = 0x86
+} CtWingCmdType_t; // 1byte
+
+// RespServiceId = ReqServiceId + 1000
+#define CTWING_SVR_ID_RESP(reqId) ((reqId) + 1000)
+
+// reffer to https://dm.ctwing.cn/
+typedef enum
+{
+    CTWING_SVR_ID_SNR_RPT = 1,
+    CTWING_SVR_ID_SIGNAL_RPT = 2,
+    CTWING_SVR_ID_DEV_INFO_RPT = 3,
+    CTWING_SVR_ID_HELLO_SAY = 9,
+    CTWING_SVR_ID_LOC_RPT = 11,
+    CTWING_SVR_ID_TIME_RPT = 13,
+    CTWING_SVR_ID_TEST_CTRL = 8002,
+    CTWING_SVR_ID_TEST_CTRL_RESP = CTWING_SVR_ID_RESP(CTWING_SVR_ID_TEST_CTRL),
+    CTWING_SVR_ID_GET_TIME = 8003,
+    CTWING_SVR_ID_GET_TIME_RESP = CTWING_SVR_ID_RESP(CTWING_SVR_ID_GET_TIME),
+    CTWING_SVR_ID_GET_LOC = 8005,
+    CTWING_SVR_ID_GET_LOC_RESP = CTWING_SVR_ID_RESP(CTWING_SVR_ID_GET_LOC),
+} CtWingServiceID_t; // 2Byte
+
+#define CT_SEND_BUFF_MAX_LEN 240
+
+typedef struct
+{
+    UINT16 cmdType;
+    UINT16 serviceID;
+    UINT16 taskId;
+} CtWingMsgHead_s; // 2Byte
+
+
 void ctApiInit(void);
 void appTimerExpFunc(uint8_t id);
 

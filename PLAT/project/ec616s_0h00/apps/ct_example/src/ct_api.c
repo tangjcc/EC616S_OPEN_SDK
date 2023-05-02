@@ -31,6 +31,8 @@
 #include "slpman_ec616s.h"
 #endif
 #include "gps_demo.h"
+#include "ps_lib_api.h"
+#include "osasys.h"
 
 
 #define USE_CTWING_PLATFORM   
@@ -181,6 +183,82 @@ static INT32 ocPSUrcCallback(urcID_t eventID, void *param, UINT32 paramLen)
     return 0;
 }
 
+#define CT_IOT_CMD_RECORD_FILE "ct_iot.dat"
+#define CT_IOT_CMD_RECORD_MAX_NUM 5
+
+static void CtIotRecordCmdMsg(void)
+{
+    OSAFILE fp = PNULL;
+    int32_t ret = 0;
+
+    // read current count
+    uint32_t cmdRecordNum = 0;
+
+    /*
+     * open the config file
+    */
+    fp = OsaFopen(CT_IOT_CMD_RECORD_FILE, "wb+");   //read & write & create
+    if (fp == PNULL)
+    {
+        printf("Can't open/create 'ct_iot.dat' file\r\n");
+        return;
+    }
+
+    /*
+     * check file size
+     */
+    ret = OsaFsize(fp);
+	ECOMM_TRACE(UNILOG_PLA_APP, CtIotRecordCmdMsg_0, P_INFO, 1, "ct_iot.dat file size:%d", ret);
+    if(ret == 0)
+    {
+        printf("First creation of 'ct_iot.dat' file\r\n");
+    }
+    else if(ret != -1)
+    {
+        /*
+         * read file
+         */
+        ret = OsaFread(&cmdRecordNum, sizeof(cmdRecordNum), 1, fp);
+        if(ret != 1)
+        {
+            printf("Can't read 'ct_iot.dat' file\r\n");
+            OsaFclose(fp);
+            return;
+        }
+		ECOMM_TRACE(UNILOG_PLA_APP, CtIotRecordCmdMsg_1, P_INFO, 1, "ct_iot.dat read:%d", cmdRecordNum);
+    }
+    else
+    {
+        printf("Can't get 'ct_iot.dat' file size\r\n");
+        OsaFclose(fp);
+        return;
+    }
+
+	// update boot count
+    cmdRecordNum += 1;
+
+    ret = OsaFseek(fp, 0, SEEK_SET);
+    if(ret != 0)
+    {
+        printf("Seek 'ct_iot.dat' file failed\r\n");
+        OsaFclose(fp);
+        return;
+    }
+
+    /*
+     * write the file body
+    */
+    ret = OsaFwrite(&cmdRecordNum, sizeof(cmdRecordNum), 1, fp);
+    if (ret != 1)
+    {
+        printf("Write 'ct_iot.dat' file failed\r\n");
+    }
+
+	ECOMM_TRACE(UNILOG_PLA_APP, CtIotRecordCmdMsg_2, P_INFO, 1, "ct_iot.dat write done:%d", cmdRecordNum);
+
+    OsaFclose(fp);
+}
+
 extern uint8_t* prv_at_decode(char* data,int datalen);
 
 static void CtIotBuildSendMsg(CtWingMsgHead_s *msgHead, uint8_t dataLen, uint8_t *data, uint8_t sendbuf[], uint16_t sendbufMax)
@@ -188,7 +266,17 @@ static void CtIotBuildSendMsg(CtWingMsgHead_s *msgHead, uint8_t dataLen, uint8_t
 	if (msgHead == NULL || data == NULL || sendbuf == NULL || sendbufMax > CT_SEND_BUFF_MAX_LEN) {
 		return;
 	}
-	sprintf((char *)sendbuf, "%02x%04x%04x%04x%s", msgHead->cmdType, msgHead->serviceID, msgHead->taskId, dataLen, data);
+	sprintf((char *)sendbuf, "%02x%04x%04x%04x", msgHead->cmdType, msgHead->serviceID, msgHead->taskId, dataLen);
+	strcat((char *)sendbuf, (char *)data);
+}
+
+static void CtIotBuildReportMsg(CtWingMsgHead_s *msgHead, uint8_t dataLen, uint8_t *data, uint8_t sendbuf[], uint16_t sendbufMax)
+{
+	if (msgHead == NULL || data == NULL || sendbuf == NULL || sendbufMax < dataLen) {
+		return;
+	}
+	sprintf((char *)sendbuf, "%02x%04x%04x", msgHead->cmdType, msgHead->serviceID, dataLen);
+	strcat((char *)sendbuf, (char *)data);
 }
 
 static void CtIotRecvProcessing(uint8_t *atbuff, uint32_t arg_len)
@@ -197,7 +285,7 @@ static void CtIotRecvProcessing(uint8_t *atbuff, uint32_t arg_len)
 	uint32_t headLen = strlen("+CTM2MRECV: ");
 	ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_0, P_INFO, "atbuff:%s", (uint8_t *)atbuff);
 	if (arg_len < headLen + msgHeadLen * 2) {
-		ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_0_1, P_INFO, 0, "error Len: arg_len:%d; except:%d", arg_len, headLen + msgHeadLen * 2);
+		ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_0_1, P_INFO, 2, "error Len: arg_len:%d; except:%d", arg_len, headLen + msgHeadLen * 2);
 		return;
 	}
 	uint8_t * buff = prv_at_decode((char *)atbuff + headLen, arg_len - headLen);
@@ -224,7 +312,23 @@ static void CtIotRecvProcessing(uint8_t *atbuff, uint32_t arg_len)
 
 	uint8_t rawDate[20] = {0};
 	uint32_t rawDateLen = 0;
-	GpsGetDateTimeString((char *)rawDate, 20, &rawDateLen);
+
+	OsaUtcTimeTValue    timeUtc;       //24 bytes
+	uint32_t ret = appGetSystemTimeUtcSync(&timeUtc);
+    ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_0_2, P_INFO, 2, "System time=0x%x..0x%x", timeUtc.UTCtimer1,timeUtc.UTCtimer2);
+	if (ret == NBStatusSuccess) {
+		uint16_t yy = (timeUtc.UTCtimer1 >> 16) & 0xFFFF;
+		uint8_t mm = (timeUtc.UTCtimer1 >> 8) & 0xFF;
+		uint8_t dd = (timeUtc.UTCtimer1) & 0xFF;
+		uint8_t hh = (timeUtc.UTCtimer2 >> 24) & 0xFF;
+		uint8_t MM = (timeUtc.UTCtimer2 >> 16) & 0xFF;
+		uint8_t ss = (timeUtc.UTCtimer2 >> 8) & 0xFF;
+		int8_t tz = (timeUtc.UTCtimer2) & 0xFF;
+ 		sprintf((char *)rawDate, "%04d%02d%02d%02d%02d%02d\r\n", yy, mm, dd, hh + tz, MM, ss);
+		rawDateLen = 14;
+	} else {
+		GpsGetDateTimeString((char *)rawDate, 20, &rawDateLen);
+	}
 	if (rawDateLen > 0) {
 		ctiot_funcv1_str_to_hex(rawDate,12,times,&lllen);
 	} else {
@@ -249,8 +353,9 @@ static void CtIotRecvProcessing(uint8_t *atbuff, uint32_t arg_len)
 
 	ECOMM_TRACE(UNILOG_PLA_APP, RecvProcessing_1, P_INFO, 4, "cmdType:%d; srvId:%x; taskId:%d; dataLen:%d", cmdType, srvId, taskId, dataLen);
 	switch (cmdType) {
-		case CTWING_CMD_TYPE_RESP:
+		case CTWING_CMD_TYPE_REQ:
 			if (srvId == CTWING_SVR_ID_GET_TIME) { // get_devtime
+				ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_2_0, P_INFO, "times:%s", (uint8_t *)times);
 				CtIotBuildSendMsg(&msgHead, timesLen, times, sendbuf, sizeof(sendbuf));
 				ECOMM_STRING(UNILOG_PLA_APP, RecvProcessing_2, P_INFO, "resp:%s", (uint8_t *)sendbuf);
 				ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
@@ -261,8 +366,144 @@ static void CtIotRecvProcessing(uint8_t *atbuff, uint32_t arg_len)
 			}
 		break;
 	}
+	CtIotRecordCmdMsg();
 	return;
 }
+
+void CtIotReportDevTimes(void)
+{
+	/* times buff */
+	uint16_t timesLen = 14;
+	uint8_t times[32]={0};
+	uint32_t lllen = (timesLen + 1) * 2;
+
+	uint8_t rawDate[20] = {0};
+	uint32_t rawDateLen = 0;
+
+	OsaUtcTimeTValue    timeUtc;       //24 bytes
+	uint32_t ret = appGetSystemTimeUtcSync(&timeUtc);
+    ECOMM_TRACE(UNILOG_PLA_APP, CtIotReportDevTimes_0, P_INFO, 2, "System time=0x%x..0x%x", timeUtc.UTCtimer1,timeUtc.UTCtimer2);
+	if (ret == NBStatusSuccess) {
+		uint16_t yy = (timeUtc.UTCtimer1 >> 16) & 0xFFFF;
+		uint8_t mm = (timeUtc.UTCtimer1 >> 8) & 0xFF;
+		uint8_t dd = (timeUtc.UTCtimer1) & 0xFF;
+		uint8_t hh = (timeUtc.UTCtimer2 >> 24) & 0xFF;
+		uint8_t MM = (timeUtc.UTCtimer2 >> 16) & 0xFF;
+		uint8_t ss = (timeUtc.UTCtimer2 >> 8) & 0xFF;
+		int8_t tz = (timeUtc.UTCtimer2) & 0xFF;
+ 		sprintf((char *)rawDate, "%04d%02d%02d%02d%02d%02d\r\n", yy, mm, dd, hh + tz, MM, ss);
+		rawDateLen = 14;
+	} else {
+		GpsGetDateTimeString((char *)rawDate, 20, &rawDateLen);
+	}
+	if (rawDateLen > 0) {
+		ctiot_funcv1_str_to_hex(rawDate,14,times,&lllen);
+	} else {
+		ctiot_funcv1_str_to_hex("20220512181000",14,times,&lllen);
+	}
+	uint8_t  sendbuf[CT_SEND_BUFF_MAX_LEN]={0};
+	CtWingMsgHead_s msgHead = {0};
+	msgHead.cmdType = CTWING_CMD_TYPE_RPT;
+	msgHead.serviceID = CTWING_SVR_ID_TIME_RPT;
+	// msgHead.taskId = taskId;
+	CtIotBuildReportMsg(&msgHead, timesLen, times, sendbuf, sizeof(sendbuf));
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevTimes_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+}
+
+void CtIotReportDevLocation(void)
+{
+	uint16_t locLen = 20;
+	uint8_t locs[40]={0};
+	uint32_t locllen = (locLen + 1) * 2;
+
+	uint8_t rawLoc[24] = {0};
+	uint32_t rawLocLen = 0;
+	GpsGetLocationString((char *)rawLoc, 24, &rawLocLen);
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevLocation_0, P_INFO, "rpt:%s", (uint8_t *)rawLoc);
+	if (rawLocLen > 0) {
+		ctiot_funcv1_str_to_hex(rawLoc,20,locs,&locllen);
+	} else {
+		ctiot_funcv1_str_to_hex("E180.22.33N044.55.11", 20 ,locs,&locllen);
+	}
+
+	uint8_t  sendbuf[CT_SEND_BUFF_MAX_LEN]={0};
+	CtWingMsgHead_s msgHead = {0};
+	msgHead.cmdType = CTWING_CMD_TYPE_RPT;
+	msgHead.serviceID = CTWING_SVR_ID_LOC_RPT;
+	CtIotBuildReportMsg(&msgHead, locllen, locs, sendbuf, sizeof(sendbuf));
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevLocation_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+}
+
+
+#define CTIOT_DEV_INFO_MAX_LEN 20
+
+static void CtIotStrToHexWithLen(const char * src, char *dest, int destMax)
+{
+	char dataBuff[CT_SEND_BUFF_MAX_LEN] = {0};
+	int srcLen = strlen(src);
+	int lllen = srcLen * 2 + 1;
+	if (lllen > destMax) {
+		return;
+	}
+	ctiot_funcv1_str_to_hex(src, srcLen, dataBuff, &lllen);
+	sprintf((char *)dest, "%04x", srcLen);
+	strcat((char *)dest, dataBuff);
+}
+
+void CtIotReportDevInfos(void)
+{
+	char *mfrName = "M01_XXX";
+	char *termType = BOARD_NAME;
+	char *modType = BOARD_NAME;
+	char *hwVer = EVB_VERSION;
+	char *swVer = SOFTVERSION;
+	char imei[CTIOT_DEV_INFO_MAX_LEN] = {0};
+	char iccid[CTIOT_DEV_INFO_MAX_LEN] = {0};
+	uint32_t ret = appGetImeiNumSync(imei);
+	ret |= appGetIccidNumSync(iccid);
+	if (ret != NBStatusSuccess) {
+		return;
+	}
+
+	char infoBuff[240] = {0};
+	char tmpBuff[CT_SEND_BUFF_MAX_LEN] = {0};
+	CtIotStrToHexWithLen(mfrName, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(termType, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(modType, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(hwVer, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(swVer, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(imei, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+	memset(tmpBuff, 0, sizeof(tmpBuff));
+	CtIotStrToHexWithLen(iccid, tmpBuff, CT_SEND_BUFF_MAX_LEN);
+	strcat((char *)infoBuff, tmpBuff);
+
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_0, P_INFO, "infoBuff:%s", (uint8_t *)infoBuff);
+
+	uint16_t infoLen = strlen(infoBuff) / 2;
+	uint8_t sendbuf[240]={0};
+
+	CtWingMsgHead_s msgHead = {0};
+	msgHead.cmdType = CTWING_CMD_TYPE_RPT;
+	msgHead.serviceID = CTWING_SVR_ID_DEV_INFO_RPT;
+	// msgHead.taskId = taskId;
+	CtIotBuildReportMsg(&msgHead, infoLen, infoBuff, sendbuf, sizeof(sendbuf));
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+}
+
 
 /*WARNING NO TIME-CONSUMING OPERATIONS CAN BE USED IN THIS FUNCTION!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 static void ctEventHandler(module_type_t type, INT32 code, const void* arg, INT32 arg_len)
