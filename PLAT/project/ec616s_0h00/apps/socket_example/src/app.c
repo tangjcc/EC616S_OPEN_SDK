@@ -24,7 +24,8 @@
 #include "debug_log.h"
 #include "slpman_ec616s.h"
 #include "plat_config.h"
-#include "hal_uart.h"
+#include "gps_demo.h"
+#include "cJSON.h"
 
 typedef enum {
     UDP_CLIENT,
@@ -34,7 +35,7 @@ typedef enum {
 } socketCaseNum;
 
 // Choose which test case to run
-static socketCaseNum testCaseNum = UDP_CLIENT;
+static socketCaseNum testCaseNum = TCP_CLIENT;
 uint8_t socketSlpHandler           = 0xff;
 
 
@@ -51,6 +52,41 @@ static QueueHandle_t            psEventQueueHandle;
 static UINT8                    gImsi[16] = {0};
 static INT32                    sockfd = -1;
 static UINT32                   gCellID = 0;
+static char g_local_ips[16] = {0};
+static char g_imei[20] = {0};
+static char g_iccid[24] = {0};
+static UINT32 g_rssi = 0;
+
+static UINT32 g_send_data_interval = 300; // s
+
+void soket_exp_dev_info_init(void)
+{
+	uint32_t ret = appGetImeiNumSync(g_imei);
+	ret |= appGetIccidNumSync(g_iccid);
+	if (ret != NBStatusSuccess) {
+		return;
+	}
+}
+
+
+void soket_exp_conn_localIP(char* localIP)
+{
+    if(localIP==NULL)
+    {
+        return;
+    }
+
+    NmAtiSyncRet netInfo;
+    NBStatus_t nbstatus=appGetNetInfoSync(0 ,&netInfo);
+	printf("gCellID =%d; ipType=%d\r\n", gCellID , netInfo.body.netInfoRet.netifInfo.ipType);
+    if ( NM_NET_TYPE_IPV4 == netInfo.body.netInfoRet.netifInfo.ipType ||
+		NM_NET_TYPE_IPV4V6 == netInfo.body.netInfoRet.netifInfo.ipType)
+    {
+        uint8_t* ips=(uint8_t *)&netInfo.body.netInfoRet.netifInfo.ipv4Info.ipv4Addr.addr;
+        sprintf(localIP,"%u.%u.%u.%u",ips[0],ips[1],ips[2],ips[3]);
+        ECOMM_STRING(UNILOG_PLA_APP, soket_exp_conn_localIP_1, P_INFO, "local IP:%s", (const uint8_t *)localIP);
+    }
+}
 
 
 static void sendQueueMsg(UINT32 msgId, UINT32 xTickstoWait)
@@ -87,6 +123,8 @@ static INT32 socketRegisterPSUrcCallback(urcID_t eventID, void *param, UINT32 pa
         case NB_URC_ID_MM_SIGQ:
         {
             rssi = *(UINT8 *)param;
+			printf("rssi:%d\r\n", rssi);
+			g_rssi = rssi;
             ECOMM_TRACE(UNILOG_PLA_APP, socketRegisterPSUrcCallback_1, P_INFO, 1, "RSSI signal=%d", rssi);
             break;
         }
@@ -254,6 +292,108 @@ static void testCaseUdpServer()
 }
 
 
+UINT32 g_seqNum = 0;
+
+extern char g_GPS_raw_data[];
+
+static void ZmBuildLoginMsg()
+{
+	cJSON* cjson_obj = NULL;
+    char* str = NULL;
+
+	OsaUtcTimeTValue    timeUtc;       //24 bytes
+	(void)appGetSystemTimeUtcSync(&timeUtc);
+
+    /* 创建一个JSON数据对象(链表头结点) */
+    cjson_obj = cJSON_CreateObject();
+#if 0
+    /* 添加一条字符串类型的JSON数据(添加一个链表节点) */
+    cJSON_AddStringToObject(cjson_obj, "id", g_imei);
+#endif
+    /* 添加一条整数类型的JSON数据(添加一个链表节点) */
+    cJSON_AddNumberToObject(cjson_obj, "zmd", 1);
+#if 0
+    /* 添加一条浮点类型的JSON数据(添加一个链表节点) */
+    cJSON_AddNumberToObject(cjson_obj, "sq", (g_seqNum % 0xFFFF));
+	if (g_seqNum >= 0xFFFF - 1) {
+		g_seqNum = 0;
+	} else {
+		g_seqNum++;
+	}
+
+	cJSON_AddStringToObject(cjson_obj, "cid", g_iccid);
+#endif
+	cJSON_AddNumberToObject(cjson_obj, "date", timeUtc.UTCsecs);
+#if 0
+	cJSON_AddNumberToObject(cjson_obj, "tick", g_send_data_interval);
+#endif
+	cJSON_AddNumberToObject(cjson_obj, "ver", 10);
+	cJSON_AddNumberToObject(cjson_obj, "hwr", 10);
+
+    /* 打印JSON对象(整条链表)的所有数据 */
+    str = cJSON_PrintUnformatted(cjson_obj);
+    printf("%s\n", str);
+	send( sockfd, str, strlen(str), 0 );
+	free(str);
+	cJSON_Delete(cjson_obj);
+}
+
+static void ZmBuildLocInfoMsg()
+{
+	cJSON* cjson_obj = NULL;
+    char* str = NULL;
+
+	OsaUtcTimeTValue    timeUtc;       //24 bytes
+	(void)appGetSystemTimeUtcSync(&timeUtc);
+
+    /* 创建一个JSON数据对象(链表头结点) */
+    cjson_obj = cJSON_CreateObject();
+
+    /* 添加一条字符串类型的JSON数据(添加一个链表节点) */
+    cJSON_AddStringToObject(cjson_obj, "id", g_imei);
+
+    /* 添加一条整数类型的JSON数据(添加一个链表节点) */
+    cJSON_AddNumberToObject(cjson_obj, "zmd", 7);
+#if 0
+    /* 添加一条浮点类型的JSON数据(添加一个链表节点) */
+    cJSON_AddNumberToObject(cjson_obj, "sq", (g_seqNum % 0xFFFF));
+	if (g_seqNum >= 0xFFFF - 1) {
+		g_seqNum = 0;
+	} else {
+		g_seqNum++;
+	}
+#endif
+	//cJSON_AddStringToObject(cjson_test, "date", "190819151045");
+	cJSON_AddNumberToObject(cjson_obj, "bat", 50);
+#if 0
+	cJSON_AddNumberToObject(cjson_obj, "rf", g_rssi);
+	cJSON_AddNumberToObject(cjson_obj, "date", timeUtc.UTCsecs);
+#endif
+	GPS_Date *pdate = NULL;
+	GPS_Location *pLoc = NULL;
+	GpsGetData(&pdate, &pLoc);
+	char buff[40] = {0};
+#if 0
+	sprintf(buff, "%02d.%02d%04d,%03d.%02d%04d,%.2f,%.2f", pLoc->weidu, pLoc->weiduMin, pLoc->weiduSec, pLoc->jingdu, pLoc->jingduMin, pLoc->jingduSec, pdate->spd, pdate->cog);
+#endif
+	sprintf(buff, "%d,%05.2f,%06.2f", timeUtc.UTCsecs, pLoc->weidu + pLoc->weiduMin / 60.0, pLoc->jingdu + pLoc->jingduMin / 60.0);
+	char *gpsstr = buff;
+	if (strlen(buff) == 0) {
+		gpsstr = "null";
+	}
+	cJSON_AddStringToObject(cjson_obj, "gps", gpsstr);
+
+    /* 打印JSON对象(整条链表)的所有数据 */
+    str = cJSON_PrintUnformatted(cjson_obj);
+    printf("%s\n", str);
+	send( sockfd, str, strlen(str), 0 );
+	free(str);
+	cJSON_Delete(cjson_obj);
+}
+
+
+UINT8 g_send_switch = 0;
+
 static void testCaseTcpClient()
 {
     eventCallbackMessage_t *queueItem = NULL;
@@ -264,9 +404,15 @@ static void testCaseTcpClient()
     struct timeval tv;
 
     struct addrinfo hints, *server_res;
-
-    CHAR   serverip[] = "47.95.193.246";
-    CHAR serverport[] = "6000";
+#if 0
+#define SEND_INTV 30
+    CHAR   serverip[] = "120.76.100.197";//"47.95.193.246";
+    CHAR serverport[] = "10002";//"6000";
+#else
+#define SEND_INTV 300
+	CHAR   serverip[] = "121.41.164.214";//"120.76.100.197";//"47.95.193.246";
+    CHAR serverport[] = "50005";//"10002";//"6000";
+#endif
     memset( &hints, 0, sizeof( hints ) );
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
@@ -274,6 +420,7 @@ static void testCaseTcpClient()
     while(1){
         if (xQueueReceive(psEventQueueHandle, &queueItem, portMAX_DELAY))
         {
+        	printf("Queue receive->0x%x\r\n", queueItem->messageId);
             ECOMM_TRACE(UNILOG_PLA_APP, testCaseTcpClient_1, P_INFO, 1, "Queue receive->0x%x", queueItem->messageId);
             switch(queueItem->messageId)
             {
@@ -283,6 +430,7 @@ static void testCaseTcpClient()
                        ECOMM_TRACE(UNILOG_HTTP_CLIENT, testCaseTcpClient_21, P_WARNING, 0, "TCP connect unresolved dns");
                     }
                     sockfd = socket(AF_INET, SOCK_STREAM, 0);
+					printf("sockfd=%d\r\n", sockfd);
                     if (sockfd < 0)
                         ECOMM_TRACE(UNILOG_PLA_APP, testCaseTcpClient_3, P_ERROR, 0, "socket create error");
                     if (connect(sockfd, (struct sockaddr *) server_res->ai_addr, server_res->ai_addrlen) < 0 && errno != EINPROGRESS) 
@@ -292,6 +440,10 @@ static void testCaseTcpClient()
                         break;
                     }
                     ECOMM_TRACE(UNILOG_PLA_APP, testCaseTcpClient_5, P_INFO, 0, "socket connect success");
+
+					soket_exp_dev_info_init();
+					soket_exp_conn_localIP(g_local_ips);
+					printf("IP:%s\r\n", g_local_ips);
 
                     sendQueueMsg(QMSG_ID_SOCK_SENDPKG, 0);
                     break;
@@ -304,8 +456,22 @@ static void testCaseTcpClient()
                     }
                     break;
                 case QMSG_ID_SOCK_SENDPKG:
-                    send( sockfd, "hello", 6, 0 );
-                    osDelay(2000);
+					printf("send data\r\n");
+					UINT32 delay_s = SEND_INTV;
+					//UINT32 gpslen = strlen(g_GPS_raw_data);
+					if (g_send_switch == 0) {
+						g_send_switch = 1;
+						delay_s = 2;
+                    	//send( sockfd, "SLM:hello", 10, 0 );
+                    	ZmBuildLoginMsg();
+						//osDelay(1 * 1000/portTICK_PERIOD_MS);
+					} else {
+						//g_send_switch = 0;
+						//send( sockfd, g_GPS_raw_data, gpslen + 1, 0 );
+						ZmBuildLocInfoMsg();
+						//osDelay(30 * 1000/portTICK_PERIOD_MS);
+					}
+                    osDelay(delay_s * 1000/portTICK_PERIOD_MS);
                     ECOMM_TRACE(UNILOG_PLA_APP, testCaseTcpClient_6, P_INFO, 0, "socket send success");
                     sendQueueMsg(QMSG_ID_SOCK_SENDPKG, 0);
                     break;
@@ -365,7 +531,49 @@ static void appInit(void *arg)
     osThreadNew(socketAppTask, NULL, &task_attr);
     
     //abupfotaInit();
+    gpsApiInit();
 }
+
+extern ARM_DRIVER_USART Driver_USART0;
+extern ARM_DRIVER_USART Driver_USART1;
+
+/*
+ *  set printf uart port
+ *  Parameter:      port: for printf
+ */
+void SetPrintUart(usart_port_t port)
+{
+    if(port == PORT_USART_0)
+    {
+#if (RTE_UART0)
+        UsartPrintHandle = &CREATE_SYMBOL(Driver_USART, 0);
+        GPR_ClockDisable(GPR_UART0FuncClk);
+        GPR_SetClockSrc(GPR_UART0FuncClk, GPR_UART0ClkSel_26M);
+        GPR_ClockEnable(GPR_UART0FuncClk);
+        GPR_SWReset(GPR_ResetUART0Func);
+#endif
+    }
+    else if(port == PORT_USART_1)
+    {
+#if (RTE_UART1)
+        UsartPrintHandle = &CREATE_SYMBOL(Driver_USART, 1);
+        GPR_ClockDisable(GPR_UART1FuncClk);
+        GPR_SetClockSrc(GPR_UART1FuncClk, GPR_UART1ClkSel_26M);
+        GPR_ClockEnable(GPR_UART1FuncClk);
+        GPR_SWReset(GPR_ResetUART1Func);
+#endif
+    }
+
+    if(UsartPrintHandle == NULL)
+        return;
+
+    UsartPrintHandle->Initialize(NULL);
+    UsartPrintHandle->PowerControl(ARM_POWER_FULL);
+    UsartPrintHandle->Control(ARM_USART_MODE_ASYNCHRONOUS | ARM_USART_DATA_BITS_8 |
+                        ARM_USART_PARITY_NONE       | ARM_USART_STOP_BITS_1 |
+                        ARM_USART_FLOW_CONTROL_NONE, 115200ul);
+}
+
 
 /**
   \fn          int main_entry(void)
@@ -375,6 +583,7 @@ static void appInit(void *arg)
 void main_entry(void) {
 
     BSP_CommonInit();
+	SetPrintUart(PORT_USART_1);
     osKernelInitialize();
     registerAppEntry(appInit, NULL);
     if (osKernelGetState() == osKernelReady)
