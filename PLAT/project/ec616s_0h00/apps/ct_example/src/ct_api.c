@@ -439,69 +439,140 @@ void CtIotReportDevLocation(void)
 
 #define CTIOT_DEV_INFO_MAX_LEN 20
 
-static void CtIotStrToHexWithLen(const char * src, char *dest, int destMax)
+void CtIotReportFlexString(char *str, int strLen, UINT16 srvId)
 {
-	char dataBuff[CT_SEND_BUFF_MAX_LEN] = {0};
-	int srcLen = strlen(src);
-	int lllen = srcLen * 2 + 1;
-	if (lllen > destMax) {
+	uint32_t rawLocLen = strLen;
+	if (rawLocLen == 0 || rawLocLen > 80) {
 		return;
 	}
-	ctiot_funcv1_str_to_hex(src, srcLen, dataBuff, &lllen);
-	sprintf((char *)dest, "%04x", srcLen);
-	strcat((char *)dest, dataBuff);
+	uint8_t  sendbuf[CT_SEND_BUFF_MAX_LEN]={0};
+	uint32_t locllen = (rawLocLen) * 2;
+	printf("DAT:%s(%d)\r\n", str, rawLocLen);
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportFlexString_0, P_INFO, "DAT:%s", (uint8_t *)str);
+	
+ 	uint8_t *ptr = sendbuf;
+ 	sprintf((char *)sendbuf, "%02x%04x%04x", CTWING_CMD_TYPE_RPT, srvId, rawLocLen + CTWING_MSG_HEAD_SIZE + CTWING_MSG_STR_LEN_SIZE);
+	ptr += CTWING_MSG_HEAD_SIZE * 2;
+	sprintf((char *)ptr, "%04x", rawLocLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(str, rawLocLen, ptr, &locllen);
+	printf("rpt:%s\r\n", sendbuf);
+ 	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportFlexString_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+}
+
+void CtIotReportFixedString(char *str, int strLen, UINT16 srvId)
+{
+	uint32_t rawLocLen = strLen;
+	if (rawLocLen == 0 || rawLocLen > 80) {
+		return;
+	}
+	uint8_t  sendbuf[CT_SEND_BUFF_MAX_LEN]={0};
+	uint32_t locllen = (rawLocLen) * 2;
+	printf("DAT:%s(%d)\r\n", str, rawLocLen);
+	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportFixedString_0, P_INFO, "DAT:%s", (uint8_t *)str);
+	
+ 	uint8_t *ptr = sendbuf;
+ 	sprintf((char *)sendbuf, "%02x%04x%04x", CTWING_CMD_TYPE_RPT, srvId, rawLocLen + CTWING_MSG_HEAD_SIZE);
+	ptr += CTWING_MSG_HEAD_SIZE * 2;
+	ctiot_funcv1_str_to_hex(str, rawLocLen, ptr, &locllen);
+	printf("rpt:%s\r\n", sendbuf);
+ 	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportFixedString_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+}
+
+
+extern char g_GPS_raw_data[];
+
+void CtIotReportGpsDataRaw(void)
+{
+	uint32_t rawLocLen = strlen(g_GPS_raw_data);
+	if (rawLocLen == 0 || rawLocLen > 80) {
+		return;
+	}
+	rawLocLen = (rawLocLen < 70 ? rawLocLen : 70);
+	CtIotReportFlexString(g_GPS_raw_data, rawLocLen, CTWING_SVR_ID_GPS_DATA_RAW_RPT);
 }
 
 void CtIotReportDevInfos(void)
 {
-	char *mfrName = "M01_XXX";
-	char *termType = BOARD_NAME;
-	char *modType = BOARD_NAME;
-	char *hwVer = EVB_VERSION;
-	char *swVer = SOFTVERSION;
+	char *mfrName = "SLM";
+	char *termType = "SLM130F";
+	char *modType = "SLM130F";
+	char *hwVer = "V1.0";
+	char *swVer = "V001.037";
 	char imei[CTIOT_DEV_INFO_MAX_LEN] = {0};
-	char iccid[CTIOT_DEV_INFO_MAX_LEN] = {0};
+	char iccid[CTIOT_DEV_INFO_MAX_LEN + 10] = {0};
 	uint32_t ret = appGetImeiNumSync(imei);
 	ret |= appGetIccidNumSync(iccid);
 	if (ret != NBStatusSuccess) {
 		return;
 	}
+	uint32_t totalLen = (strlen(mfrName) + strlen(termType) + strlen(modType) + 
+						 strlen(hwVer) + strlen(swVer) + strlen(imei) + strlen(iccid)) + 
+						 CTWING_MSG_HEAD_SIZE + CTWING_MSG_STR_LEN_SIZE * 7;
+	uint8_t  sendbuf[CT_SEND_BUFF_MAX_LEN + 20]={0};
+	uint32_t hexLen, strLen;
+	//ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_0, P_INFO, "DAT:%s", (uint8_t *)str);
+	printf("ICCID:%s\r\n", iccid);
+	
+ 	uint8_t *ptr = sendbuf;
+	// Head
+	sprintf((char *)sendbuf, "%02x%04x%04x", CTWING_CMD_TYPE_RPT, CTWING_SVR_ID_DEV_INFO_RPT, totalLen);
+	ptr += CTWING_MSG_HEAD_SIZE * 2;
+	//p1
+	strLen = strlen(mfrName);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(mfrName, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p2
+	strLen = strlen(termType);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(termType, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p3
+	strLen = strlen(modType);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(modType, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p4
+	strLen = strlen(hwVer);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(hwVer, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p5
+	strLen = strlen(swVer);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(swVer, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p6
+	strLen = strlen(imei);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(imei, strLen, ptr, &hexLen);
+	ptr += hexLen;
+	//p7
+	strLen = strlen(iccid);
+	hexLen = strLen * 2;
+	sprintf((char *)ptr, "%04x", strLen);
+	ptr += CTWING_MSG_STR_LEN_SIZE * 2;
+	ctiot_funcv1_str_to_hex(iccid, strLen, ptr, &hexLen);
+	ptr += hexLen;
 
-	char infoBuff[240] = {0};
-	char tmpBuff[CT_SEND_BUFF_MAX_LEN] = {0};
-	CtIotStrToHexWithLen(mfrName, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(termType, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(modType, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(hwVer, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(swVer, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(imei, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-	memset(tmpBuff, 0, sizeof(tmpBuff));
-	CtIotStrToHexWithLen(iccid, tmpBuff, CT_SEND_BUFF_MAX_LEN);
-	strcat((char *)infoBuff, tmpBuff);
-
-	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_0, P_INFO, "infoBuff:%s", (uint8_t *)infoBuff);
-
-	uint16_t infoLen = strlen(infoBuff) / 2;
-	uint8_t sendbuf[240]={0};
-
-	CtWingMsgHead_s msgHead = {0};
-	msgHead.cmdType = CTWING_CMD_TYPE_RPT;
-	msgHead.serviceID = CTWING_SVR_ID_DEV_INFO_RPT;
-	// msgHead.taskId = taskId;
-	CtIotBuildReportMsg(&msgHead, infoLen, infoBuff, sendbuf, sizeof(sendbuf));
-	ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
-	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
+	printf("DevInfo rpt:%s\r\n", sendbuf);
+ 	//ECOMM_STRING(UNILOG_PLA_APP, CtIotReportDevInfos_1, P_INFO, "rpt:%s", (uint8_t *)sendbuf);
+ 	ctiot_funcv1_send(NULL, (char *)sendbuf, SENDMODE_CON, NULL, 0);
 }
 
 

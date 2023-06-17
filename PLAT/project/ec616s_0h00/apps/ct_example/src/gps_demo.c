@@ -5,8 +5,8 @@
 #include "osasys.h"
 #include "ostask.h"
 #include "queue.h"
-#include "ct_api.h"
 #include "gps_proc.h"
+#include "app.h"
 
 void GpsDataRecvProcessing(uint8_t *rawData, uint32_t rawDataLen);
 
@@ -70,7 +70,7 @@ void USART_callback(uint32_t event)
         isRecvComplete = true;
     }
 }
-
+#if 0
 void USART_ExampleEntry_org(void)
 {
     /*Initialize the USART driver */
@@ -120,6 +120,7 @@ void USART_ExampleEntry_org(void)
 #endif
     }
 }
+#endif
 
 void USART_ExampleEntry(void *arg)
 {
@@ -153,6 +154,7 @@ void USART_ExampleEntry(void *arg)
 		recvCount++;
 		if (recBuffer[recvCount - 1] == '\n') {
 			GpsDataRecvProcessing(recBuffer, recvCount);
+			recBuffer[recvCount] = '\0';
 			recvCount=0;
 		}
         //USARTdrv->Send(recBuffer, 1);
@@ -182,24 +184,33 @@ void USART_ExampleEntry(void *arg)
     }
 }
 
-extern QueueHandle_t ct_state_msg_handle;
+#ifndef DEV_BRD_DBG
 
-void GpsDataProcEntry(void *arg)
+/** \brief GPS_EN location */
+#define GPS_EN_GPIO_INSTANCE        (0)
+#define GPS_EN_GPIO_PIN             (5)
+#define GPS_EN_PAD_INDEX            (16)
+#define GPS_EN_PAD_ALT_FUNC         (PAD_MuxAlt0)
+
+void gpsEnable(void)
 {
-	printf("GpsDataProcEntry\r\n");
-	CT_STATUS_Q_MSG ctMsg;
-    memset(&ctMsg, 0, sizeof(ctMsg));
-	//int i, cnt;
+	printf("GPS Enable GPIO config\r\n");
 
-    while (1)
-    {
-		//printf("data Waiting...\r\n");
+    // GPIO function select
+    pad_config_t padConfig;
+    PAD_GetDefaultConfig(&padConfig);
 
-		ctMsg.status_type = APP_GPS_RECEIVED;
-		xQueueSend(ct_state_msg_handle, &ctMsg, CT_MSG_TIMEOUT);
-		osDelay(500/portTICK_PERIOD_MS);
-    }
+    padConfig.mux = GPS_EN_PAD_ALT_FUNC;
+    PAD_SetPinConfig(GPS_EN_PAD_INDEX, &padConfig);
+
+    // GPS_EN pin config
+    gpio_pin_config_t config;
+    config.pinDirection = GPIO_DirectionOutput;
+    config.misc.initOutput = 0;
+
+    GPIO_PinConfig(GPS_EN_GPIO_INSTANCE, GPS_EN_GPIO_PIN, &config);
 }
+#endif
 
 // app task static stack and control block
 #ifdef WITH_DTLS
@@ -207,28 +218,6 @@ void GpsDataProcEntry(void *arg)
 #else
     #define GPS_TASK_STACK_SIZE    (1024)
 #endif
-
-static StaticTask_t             gpsDataProcTask;
-static UINT8                    gpsDataProcTaskStack[GPS_TASK_STACK_SIZE];
-
-void gpsDataProcInit(void)
-{
-    // Apply own right power policy according to design
-	printf("gpsDataProcInit\r\n");
-    osThreadAttr_t task_attr;
-    memset(&task_attr,0,sizeof(task_attr));
-    memset(gpsDataProcTaskStack, 0xA5, GPS_TASK_STACK_SIZE);
-    task_attr.name = "gpsDataProc_task";
-    task_attr.stack_mem = gpsDataProcTaskStack;
-    task_attr.stack_size = GPS_TASK_STACK_SIZE;
-    task_attr.priority = osPriorityNormal;
-    task_attr.cb_mem = &gpsDataProcTask;//task control block
-    task_attr.cb_size = sizeof(StaticTask_t);//size of task control block
-
-    //osThreadId_t t1 = osThreadNew(GpsDataProcEntry, NULL, &task_attr);  //创建连接平台线程
-    //printf("gpsDataProcInit ==%p==\r\n", t1);
-}
-
 
 static StaticTask_t             usartTask;
 static UINT8                    usartTaskStack[GPS_TASK_STACK_SIZE];
@@ -248,7 +237,10 @@ void gpsApiInit(void)
     task_attr.cb_size = sizeof(StaticTask_t);//size of task control block
 
     osThreadNew(USART_ExampleEntry, NULL, &task_attr);  //创建连接平台线程
-	gpsDataProcInit();
+#ifndef DEV_BRD_DBG
+	gpsEnable();
+	I2C_init();
+#endif
 }
 
 extern unsigned char Flag_Calc_GPGGA_OK;
@@ -257,13 +249,19 @@ extern unsigned char Flag_Calc_GPRMC_OK;
 GPS_Date g_GPS_Date = {0};
 GPS_Location g_GPS_Location = {0};
 
+#define GPS_RAW_DATA_MAX_LEN 80
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+char g_GPS_raw_data[GPS_RAW_DATA_MAX_LEN] = {0};
+
 void GpsDataRecvProcessing(uint8_t *rawData, uint32_t rawDataLen)
 {
-	
-	printf("GpsDataRecvProcessing:[%d]%s\r\n", rawDataLen, rawData);
-	//printf("[0x%02x0x%02x0x%02x0x%02x]\r\n", rawData[0], rawData[1], rawData[2], rawData[3]);
+	//printf("GpsDataRecvProcessing:[%d]%s\r\n", rawDataLen, rawData);
 
 	if (GPS_IS_GPGGA_DATA(rawData)) {
+		printf("GPS:[%d]%s\r\n", rawDataLen, rawData);
+		rawDataLen = MAX(rawDataLen + 1, GPS_RAW_DATA_MAX_LEN);
+		strncpy(g_GPS_raw_data, (char *)rawData, rawDataLen);
+		g_GPS_raw_data[rawDataLen - 1] = '\0';
 		GPS_GPGGA_CAL(rawData, &g_GPS_Date, &g_GPS_Location);
 	}
 	if (GPS_IS_GPRMC_DATA(rawData)) {
@@ -302,10 +300,23 @@ void GpsGetLocationString(char *out, int maxLen, int *actLen)
 		return;
 	}
 	GPS_Location *loc = &g_GPS_Location;
-	sprintf(out, "%c%03d.%02d.%02d%c%03d.%02d.%02d\r\n",
-		loc->jingduFlag, loc->jingdu, loc->jingduMin, loc->jingduSec,
-		loc->weiduFlag, loc->weidu, loc->weiduMin, loc->weiduSec);
+	sprintf(out, "%c%03d.%f%c%03d.%f\r\n",
+		loc->jingduFlag, loc->jingdu, loc->jingduMin,
+		loc->weiduFlag, loc->weidu, loc->weiduMin);
 	*actLen = 20;
+}
+
+void GpsGetRawData(char *out, int maxLen, int *actLen)
+{
+	int gpsDataLen = strlen(g_GPS_raw_data);
+	if (out == NULL || maxLen < gpsDataLen) {
+		return;
+	}
+	if (gpsDataLen == 0) {
+		return;
+	}
+	strncpy(out, g_GPS_raw_data, gpsDataLen + 1);
+	*actLen = gpsDataLen;
 }
 
 

@@ -30,9 +30,16 @@
 #define INIT_TASK_STACK_SIZE    (1024)
 static StaticTask_t             initTask;
 static UINT8                    appTaskStack[INIT_TASK_STACK_SIZE];
-UINT32 sendDataItv = 600;
+#ifndef DEV_BRD_DBG
+UINT32 sendDataItv = 600; // s
+#else
+UINT32 sendDataItv = 60; // s
+#endif
 UINT8 seqNumb = 0;
 UINT8 retrySend = 0;
+
+UINT8 g_send_devinfo = 0;
+UINT8 g_send_done = 0;
 
 QueueHandle_t app_cmd_msg_handle = NULL;
 
@@ -40,6 +47,9 @@ extern QueueHandle_t ct_state_msg_handle;
 
 extern void CtIotReportDevTimes(void);
 extern void CtIotReportDevLocation(void);
+extern void CtIotReportGpsDataRaw(void);
+extern void CtIotReportDevInfos(void);
+
 
 static void appTask(void *arg)
 {
@@ -65,30 +75,37 @@ static void appTask(void *arg)
                  //SENDMODE_CON is mandatory if DL data immediately after UL data
                  //ctiot_funcv1_send(NULL, "0356323334", SENDMODE_CON, NULL, seqNumb);
 				 //printf("send begin\n");
-				 if(ctiot_funcv1_str_to_hex("hello world",11,ddatabuf,&lllen)==0)
-				 {
-				 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_100, P_INFO, 3, "020009%04x;ddatabuf:[%x%x]",lllen,ddatabuf[0], ddatabuf[1]);
-					//printf("ddatabuf:%s\n",ddatabuf);
+				 g_send_done = 0;
+				 if (g_send_devinfo == 0) {
+				 	 g_send_devinfo = 1;
+					 if(ctiot_funcv1_str_to_hex("hello world",11,ddatabuf,&lllen)==0)
+					 {
+					 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_100, P_INFO, 3, "020009%04x;ddatabuf:[%x%x]",lllen,ddatabuf[0], ddatabuf[1]);
+						//printf("ddatabuf:%s\n",ddatabuf);
+					 }
+					 else
+					 {
+					 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_99, P_INFO, 1, "fail -1");
+						//printf("fail -1\n");
+					 }
+					 ECOMM_STRING(UNILOG_PLA_APP, appTask_101, P_INFO, "ddatabuf:%s", (uint8_t *)ddatabuf);
+					 sprintf(sendbuf, "020009%04X", 11);
+					 strcat(sendbuf, ddatabuf);
+					 ECOMM_STRING(UNILOG_PLA_APP, appTask_102, P_INFO, "sendbuf:%s", (uint8_t *)sendbuf); //"020009000B68656c6c6f20776f726c64"
+					 ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, seqNumb);
+					 CtIotReportDevInfos();
 				 }
-				 else
-				 {
-				 	ECOMM_TRACE(UNILOG_PLA_APP, appTask_99, P_INFO, 1, "fail -1");
-					//printf("fail -1\n");
-				 }
-				 ECOMM_STRING(UNILOG_PLA_APP, appTask_101, P_INFO, "ddatabuf:%s", (uint8_t *)ddatabuf);
-				 sprintf(sendbuf, "020009%04X", 11);
-				 strcat(sendbuf, ddatabuf);
-				 ECOMM_STRING(UNILOG_PLA_APP, appTask_102, P_INFO, "sendbuf:%s", (uint8_t *)sendbuf); //"020009000B68656c6c6f20776f726c64"
-				 ctiot_funcv1_send(NULL, sendbuf, SENDMODE_CON, NULL, seqNumb);
-
 				 CtIotReportDevTimes();
-				 CtIotReportDevLocation();
-				 //CtIotReportDevInfos();
-				 
+				 //CtIotReportDevLocation();
+				 CtIotReportGpsDataRaw();
+				 g_send_done = 1;
                  break;
             case APP_SEND_PACKET_DONE://recive send packet's ACK
                  ECOMM_TRACE(UNILOG_PLA_APP, appTask_2, P_INFO, 0, "packet arrived, enable sleep");
-                 ctiot_funcv1_enable_sleepmode();
+				 if (g_send_done == 1) {
+				 	g_send_done = 0;
+				 	ctiot_funcv1_enable_sleepmode();
+				 }
                  break;
             case APP_SEND_PACKET_FAILED://exceeded the maximum number of retries send packet hasn'g get ACK 
                  ECOMM_TRACE(UNILOG_PLA_APP, appTask_3, P_ERROR, 0, "packet send failed, retry it, if retry failed re-register oc");

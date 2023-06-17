@@ -10,17 +10,17 @@ typedef struct {
 	unsigned int Hour;
 	unsigned int Min;
 	unsigned int Sec;
+	double spd;
+	double cog;
 }GPS_Date;
 
 typedef struct {
 	unsigned char jingduFlag;
 	unsigned int jingdu;
-	unsigned int jingduMin;
-	unsigned int jingduSec;
+	double jingduMin;
 	unsigned char weiduFlag;
 	unsigned int weidu;
-	unsigned int weiduMin;
-	unsigned int weiduSec;
+	double weiduMin;
 	double altitude;
 	unsigned int satNum;
 }GPS_Location;

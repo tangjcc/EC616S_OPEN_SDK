@@ -1,5 +1,6 @@
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "bsp.h"
 #include "gps_proc.h"
@@ -7,14 +8,50 @@
 unsigned char Flag_Calc_GPGGA_OK = 0;//计算完成标志位
 unsigned char Flag_Calc_GPRMC_OK = 0;//计算完成标志位
 
-unsigned char IsLeapYear (unsigned int uiYear);
-unsigned char GetMaxDay (unsigned char Month_Value, unsigned int Year_Value);
+static unsigned char IsLeapYear (unsigned int uiYear);
+static unsigned char GetMaxDay (unsigned char Month_Value, unsigned int Year_Value);
 
+static int GetComma(int num, const char *str)
+{
+	int i,j=0;
+	int len=strlen(str);
+	for(i=0;i<len;i++)
+	{
+		if(str[i]==',')
+			j++;
+		if(j==num)
+			return i+1; /*返回当前找到的逗号位置的下一个位置*/
+	}
+	return 0;
+}
+static double get_double_number(const char *s)
+{
+	char buf[128];
+	int i;
+	double rev;
+	i=GetComma(1,s);/*得到数据长度 */
+	strncpy(buf,s,i);
+	buf[i]=0; /*加字符串结束标志*/
+	rev=atof(buf);/*字符串转float */
+	return rev;
+}
+
+static int get_int_number(const char *s)
+{
+	char buf[128];
+	int i;
+	double rev;
+	i=GetComma(1,s);/*得到数据长度*/
+	strncpy(buf,s,i);
+	buf[i]=0; /*加字符串结束标志 */
+	rev=atoi(buf);/*字符串转float */
+	return rev;
+}
 
 //****************************************************
 //UTC日期与当地日期转换
 //****************************************************
-void UTCDate2LocalDate (GPS_Date *date)
+static void UTCDate2LocalDate (GPS_Date *date)
 {
 	date->Day = date->Day + date->Flag_OV;		//日  加一
 	date->Month = date->Month;
@@ -35,7 +72,7 @@ void UTCDate2LocalDate (GPS_Date *date)
 //****************************************************
 //获取当月日期最大值
 //****************************************************
-unsigned char GetMaxDay (unsigned char Month_Value, unsigned int Year_Value)
+static unsigned char GetMaxDay (unsigned char Month_Value, unsigned int Year_Value)
 {
 	unsigned char iDays;
 	switch (Month_Value)
@@ -74,16 +111,23 @@ unsigned char GetMaxDay (unsigned char Month_Value, unsigned int Year_Value)
 //****************************************************
 //闰年检测
 //****************************************************
-unsigned char IsLeapYear (unsigned int uiYear)
+static unsigned char IsLeapYear (unsigned int uiYear)
 {
 	return ( ( (uiYear % 4) == 0) && ( (uiYear % 100) != 0)) || ( (uiYear % 400) == 0);
 }
 
 void GPS_GPGGA_CAL(unsigned char *rxBuffer, GPS_Date *date, GPS_Location *loc)  //"GPGGA"这一帧数据检测处理
 {
-	if (rxBuffer[3] == 'G' && rxBuffer[4] == 'G' && rxBuffer[5] == 'A' && rxBuffer[13] == '.')			//确定是否收到"GPGGA"这一帧数据
+	int pos = 0;
+	int posEnd = 0;
+	if (rxBuffer[3] == 'G' && rxBuffer[4] == 'G' && rxBuffer[5] == 'A')			//确定是否收到"GPGGA"这一帧数据
 	{
-		date->Hour = (rxBuffer[7] - 0x30) * 10 + (rxBuffer[8] - 0x30) + 8;	//UTC时间转换到北京时间UTC+8
+		pos = GetComma(1, (const char *)rxBuffer); //7
+		posEnd = GetComma(2, (const char *)rxBuffer);
+		if (posEnd - pos < 10) {
+			return;
+		}
+		date->Hour = (rxBuffer[pos] - 0x30) * 10 + (rxBuffer[pos + 1] - 0x30) + 8;	//UTC时间转换到北京时间UTC+8
 		//0X30为ASCII码转换为数字
 		if (date->Hour >= 24) {
 			date->Hour %= 24;				//获取当前Hour
@@ -94,31 +138,50 @@ void GPS_GPGGA_CAL(unsigned char *rxBuffer, GPS_Date *date, GPS_Location *loc)  
 		}
 		//Min_High = rxBuffer[9] - 0X30; //-0X30由ASCII转为十进制
 		//Min_Low = rxBuffer[10] - 0X30;
-		date->Min = (rxBuffer[9] - 0X30) * 10 + (rxBuffer[10] - 0X30);
+		date->Min = (rxBuffer[pos + 2] - 0X30) * 10 + (rxBuffer[pos + 3] - 0X30);
 		//Sec_High = rxBuffer[11] - 0X30;
 		//Sec_Low = rxBuffer[12] - 0X30;
-		date->Sec = (rxBuffer[11] - 0X30) * 10 + (rxBuffer[12] - 0X30);
+		date->Sec = (rxBuffer[pos + 4] - 0X30) * 10 + (rxBuffer[pos + 5] - 0X30);
 
-		if (rxBuffer[28] == 78) {
-			loc->weiduFlag = 'N';//北纬
-		} else {	
-			loc->weiduFlag = 'S';	//南纬
+		pos = posEnd;
+		posEnd = GetComma(3, (const char *)rxBuffer);
+		if (posEnd - pos < 9) {
+			return;
 		}
-		loc->weidu = (rxBuffer[17] - 0X30) * 10 + (rxBuffer[18] - 0X30);
-		loc->weiduMin = (rxBuffer[19] - 0X30) * 10 + (rxBuffer[20] - 0X30);
-		loc->weiduSec = (rxBuffer[22] - 0X30) * 100 + (rxBuffer[23] - 0X30) * 10 + (rxBuffer[24] - 0X30);
+		loc->weidu = (rxBuffer[pos] - 0X30) * 10 + (rxBuffer[pos + 1] - 0X30);
+		//loc->weiduMin = (rxBuffer[pos + 2] - 0X30) * 10 + (rxBuffer[pos + 3] - 0X30);
+		//loc->weiduSec = (rxBuffer[pos + 5] - 0X30) * 1000 + (rxBuffer[pos + 6] - 0X30) * 100 + (rxBuffer[pos + 7] - 0X30) * 10 + (rxBuffer[pos + 8] - 0X30);
+		loc->weiduMin = get_double_number((const char *)&rxBuffer[pos + 2]);
 
-		if (rxBuffer[42] == 69) {
-			loc->jingduFlag = 'E';//北纬
-		} else {	
-			loc->jingduFlag = 'W';	//南纬
+		pos = posEnd;
+		posEnd = GetComma(4, (const char *)rxBuffer);
+		if (posEnd - pos < 1) {
+			return;
 		}
-		loc->jingdu = (rxBuffer[30] - 0X30) * 100 + (rxBuffer[31] - 0X30) * 10 + (rxBuffer[32] - 0X30);
-		loc->jingduMin = (rxBuffer[33] - 0X30) * 10 + (rxBuffer[34] - 0X30);
-		loc->jingduSec = (rxBuffer[36] - 0X30) * 100 + (rxBuffer[37] - 0X30) * 10 + (rxBuffer[38] - 0X30);
+		loc->weiduFlag = rxBuffer[pos];
 
-		loc->altitude= (rxBuffer[54] - 0X30) * 100 + (rxBuffer[55] - 0X30) * 10 + (rxBuffer[56] - 0X30);
-		loc->satNum= (rxBuffer[47] - 0X30);
+		pos = posEnd;
+		posEnd = GetComma(5, (const char *)rxBuffer);
+		if (posEnd - pos < 10) {
+			return;
+		}
+		loc->jingdu = (rxBuffer[pos] - 0X30) * 100 + (rxBuffer[pos + 1] - 0X30) * 10 + (rxBuffer[pos + 2] - 0X30);
+		//loc->jingduMin = (rxBuffer[pos + 3] - 0X30) * 10 + (rxBuffer[pos + 4] - 0X30);
+		//loc->jingduSec = (rxBuffer[pos + 6] - 0X30) * 1000 + (rxBuffer[pos + 7] - 0X30) * 100 + (rxBuffer[pos + 8] - 0X30) * 10 + (rxBuffer[pos + 9] - 0X30);
+		loc->jingduMin = get_double_number((const char *)&rxBuffer[pos + 3]);
+
+		pos = posEnd;
+		posEnd = GetComma(6, (const char *)rxBuffer);
+		if (posEnd - pos < 1) {
+			return;
+		}
+		loc->jingduFlag = rxBuffer[pos];
+
+		pos = GetComma(7, (const char *)rxBuffer);
+		loc->satNum= get_int_number((const char *)&rxBuffer[pos]);
+		pos = GetComma(9, (const char *)rxBuffer);
+		loc->altitude = get_double_number((const char *)&rxBuffer[pos]);
+
 		Flag_Calc_GPGGA_OK = 1;
 	}
 }
@@ -126,20 +189,22 @@ void GPS_GPGGA_CAL(unsigned char *rxBuffer, GPS_Date *date, GPS_Location *loc)  
 
 void GPS_GPRMC_CAL(unsigned char *rxBuffer, GPS_Date *date) //"GPRMC"这一帧数据检测处理
 {
-	if (rxBuffer[4] == 'M' && rxBuffer[52] == ',' && rxBuffer[59] == ',')			//确定是否收到"GPRMC"这一帧数据
+	int pos = 0;
+	int posEnd = 0;
+	if (rxBuffer[3] == 'R' && rxBuffer[4] == 'M' && rxBuffer[5] == 'C')			//确定是否收到"GPRMC"这一帧数据
 	{
-		//Year_High = rxBuffer[57];
-		//Year_Low = rxBuffer[58];
-		date->Year = (rxBuffer[57] - 0x30) * 10 + rxBuffer[58];
-
-		//Month_High = rxBuffer[55];
-		//Month_Low = rxBuffer[56];
-		date->Month= (rxBuffer[55] - 0x30) * 10 + rxBuffer[56];
-
-		//Day_High = rxBuffer[53];
-		//Day_Low = rxBuffer[54];
-		date->Day = (rxBuffer[53] - 0x30) * 10 + rxBuffer[54];
-
+		pos = GetComma(7, (const char *)rxBuffer);
+		date->spd = get_double_number((const char *)&rxBuffer[pos]);
+		pos = GetComma(8, (const char *)rxBuffer);
+		date->cog= get_double_number((const char *)&rxBuffer[pos]);
+		pos = GetComma(9, (const char *)rxBuffer);
+		posEnd = GetComma(10, (const char *)rxBuffer);
+		if (posEnd - pos < 6) {
+			return;
+		}
+		date->Day = (rxBuffer[pos] - 0x30) * 10 + (rxBuffer[pos + 1] - 0x30);
+		date->Month= (rxBuffer[pos + 2] - 0x30) * 10 + (rxBuffer[pos + 3] - 0x30);
+		date->Year = (rxBuffer[pos + 4] - 0x30) * 10 + (rxBuffer[pos + 5] - 0x30);
 
 		UTCDate2LocalDate(date);			//UTC日期转换为北京时间
 
@@ -157,9 +222,9 @@ void GPS_DateShow(GPS_Date *date)
 void GPS_LocationShow(GPS_Location *loc)
 {
 	//jindu weidu altitude
-	printf("LOC:%d:%03d^%02d\'%02d\'\'/%c:%03d^%02d\'%02d\'\'#%dm\r\n",
-		loc->jingduFlag, loc->jingdu, loc->jingduMin, loc->jingduSec,
-		loc->weiduFlag, loc->weidu, loc->weiduMin, loc->weiduSec,
+	printf("LOC:%c:%03d.%05.2f|%c:%02d.%05.2f#%lfm\r\n",
+		loc->jingduFlag, loc->jingdu, loc->jingduMin,
+		loc->weiduFlag, loc->weidu, loc->weiduMin,
 		loc->altitude);
 }
 
@@ -168,10 +233,7 @@ unsigned char GPS_IS_GPGGA_DATA(unsigned char *rawData)
 	if (strlen((const char *)rawData) < GPS_DATA_HEAD_LEN) {
 		return 0;
 	}
-	if (strncmp((const char *)rawData, GPGGA_STR, GPS_DATA_HEAD_LEN) == 0) {
-		return 1;
-	}
-	return 0;
+	return (rawData[3] == 'G' && rawData[4] == 'G' && rawData[5] == 'A');
 }
 
 unsigned char GPS_IS_GPRMC_DATA(unsigned char *rawData)
@@ -179,9 +241,6 @@ unsigned char GPS_IS_GPRMC_DATA(unsigned char *rawData)
 	if (strlen((const char *)rawData) < GPS_DATA_HEAD_LEN) {
 		return 0;
 	}
-	if (strncmp((const char *)rawData, GPRMC_STR, GPS_DATA_HEAD_LEN) == 0) {
-		return 1;
-	}
-	return 0;
+	return (rawData[3] == 'R' && rawData[4] == 'M' && rawData[5] == 'C');
 }
 
