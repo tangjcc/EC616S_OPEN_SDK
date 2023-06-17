@@ -6,6 +6,7 @@
 #include "ostask.h"
 #include "queue.h"
 #include "gps_proc.h"
+#include "i2c_proc.h"
 #include "app.h"
 
 void GpsDataRecvProcessing(uint8_t *rawData, uint32_t rawDataLen);
